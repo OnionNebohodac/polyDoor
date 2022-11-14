@@ -6,16 +6,22 @@
 #include <SPI.h>
 #include <MFRC522.h>
 
+
 #include "BluetoothSerial.h"
 #include "config.h"
+/*
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
 #error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
-#endif
+#endif*/
 
 // Create instances
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 bool door_locked = true;
+
+bool door_closed = false;
+unsigned long door_open = 0;
+
 unsigned long last_open = 0;
 BluetoothSerial SerialBT;
 class Terminal {
@@ -43,6 +49,10 @@ void setup() {
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   pinMode(PIN_RELAY, OUTPUT);
   digitalWrite(PIN_RELAY, LOW);
+
+  pinMode(DOOR_C, OUTPUT);
+  pinMode(DOOR_NO, INPUT);
+  pinMode(DOOR_NC, INPUT);
 
   Serial.begin(115200);
   SerialBT.begin("Polyhedra Door");  //Bluetooth device name
@@ -92,6 +102,8 @@ void loop() {
         case CMD_STATUS:
           if (door_locked == false) {
             terminal->println("Open");
+          } else if (door_closed == false) {
+              terminal->println("Locked but not closed");
           } else {
             terminal->println("Closed");
           }
@@ -122,8 +134,21 @@ void loop() {
         door_locked = true;
       }
     }
+
+    digitalWrite(DOOR_C, HIGH);
+    if (digitalRead(DOOR_NC) == HIGH) { 
+      door_closed = false;
+      } else if (digitalRead(DOOR_NO) == HIGH) {
+        door_closed = true;
+      }
+    if ((door_locked == true) && (door_closed == false) && (millis() - door_open > SENDFREQ)) {
+      terminal->println("The door is not closed");
+      door_open = millis();
+    }
+    digitalWrite(DOOR_C, LOW);
+
     delay(20);
-  }
+}
 
 
   boolean query_access(String tagID) {

@@ -4,14 +4,20 @@
 #define PIN_BUTTON 12
 #define PIN_RELAY 4
 #define TIMEON 5 * 1000
+#define SENDFREQ 20 * 1000
 
 #define RST_PIN 0
 #define SS_PIN 5
 #define DEBUG false
 
+#define DOOR_C 27
+#define DOOR_NO 32
+#define DOOR_NC 33
+
 #define MISO 19
 #define MOSI 23
 #define SCK 18
+
 
 /*
 Vcc <-> 3V3 (or Vin(5V) depending on the module version)
