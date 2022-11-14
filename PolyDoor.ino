@@ -9,10 +9,10 @@
 
 #include "BluetoothSerial.h"
 #include "config.h"
-/*
+
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
 #error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
-#endif*/
+#endif
 
 // Create instances
 MFRC522 mfrc522(SS_PIN, RST_PIN);
