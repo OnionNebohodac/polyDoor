@@ -5,13 +5,13 @@
 #define PIN_RELAY 4
 #define TIMEON 5 * 1000
 #define SENDFREQ 20 * 1000
-
+//rfid
 #define RST_PIN 0
 #define SS_PIN 5
-#define DEBUG false
+#define DEBUG true
 
-#define DOOR_C 27
-#define DOOR_NO 32
+#define DOOR_C 32
+//#define DOOR_NO 27 //unused 
 #define DOOR_NC 33
 
 #define MISO 19
@@ -47,6 +47,7 @@ SS/SDA (Slave select) <-> 5
 #define CMD_SOURCE_BUTTON 2
 #define CMD_SOURCE_RFID 3
 #define MEMBERS 20
+#define RFIDUPDATETIME 10 * 60000
 //GLOBAL VARS
 byte readCard[4];
 String * MasterTag[MEMBERS] ;	// REPLACE this Tag ID with your Tag ID!!!
