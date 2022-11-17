@@ -8,7 +8,7 @@
 //rfid
 #define RST_PIN 0
 #define SS_PIN 5
-#define DEBUG true
+#define DEBUG false
 
 #define DOOR_C 32
 //#define DOOR_NO 27 //unused 
@@ -47,10 +47,10 @@ SS/SDA (Slave select) <-> 5
 #define CMD_SOURCE_BUTTON 2
 #define CMD_SOURCE_RFID 3
 #define MEMBERS 20
-#define RFIDUPDATETIME 10 * 60000
+#define RFIDUPDATETIME 30 * 1000
 //GLOBAL VARS
 byte readCard[4];
-String * MasterTag[MEMBERS] ;	// REPLACE this Tag ID with your Tag ID!!!
+String * MasterTag[MEMBERS] ;	
 
 String tagID = "";
 
