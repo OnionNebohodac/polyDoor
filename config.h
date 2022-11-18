@@ -4,11 +4,11 @@
 #define PIN_BUTTON 12
 #define PIN_RELAY 4
 #define TIMEON 5 * 1000
-#define SENDFREQ 20 * 1000
+#define SENDFREQ 20 * 1000  //unused
 //rfid
 #define RST_PIN 0
 #define SS_PIN 5
-#define DEBUG true
+#define DEBUG false
 
 #define DOOR_C 32
 //#define DOOR_NO 27 //unused 
@@ -47,10 +47,17 @@ SS/SDA (Slave select) <-> 5
 #define CMD_SOURCE_BUTTON 2
 #define CMD_SOURCE_RFID 3
 #define MEMBERS 20
-#define RFIDUPDATETIME 10 * 60000
+#define RFIDUPDATETIME 10 * 60 * 1000
+
+#define BOT_TOKEN "5853998721:AAHPN0mbDyA7oYJaMEQfWokrCppiX3iOGoM" //telegram bot
+#define CHAT_ID_1 "5958442135" //KOSTA TELEGRAM
+#define CHAT_ID_2 "5709761234" //MEIR TELEGRAM
+
+#define TESTPIN1 26
+#define TESTPIN2 27
 //GLOBAL VARS
 byte readCard[4];
-String * MasterTag[MEMBERS] ;	// REPLACE this Tag ID with your Tag ID!!!
+String * MasterTag[MEMBERS] ;	
 
 String tagID = "";
 

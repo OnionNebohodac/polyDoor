@@ -8,6 +8,8 @@
 #include <WiFi.h>
 #include "config.h"
 #include <HTTPClient.h>
+#include <UniversalTelegramBot.h>
+#include <WiFiClientSecure.h>
 
 
 // Create instances
@@ -27,12 +29,22 @@ unsigned long previousTime = 0;
 // Define timeout time in milliseconds (example: 2000ms = 2s)
 const long timeoutTime = 10000;
 
-String GOOGLE_SCRIPT_ID = "AKfycbwn-XcMW-Hru2yYDw0NyfdAhjDgYQYieNDrGQTWFBn8gO-h6GH_YqUVE6KNTz2uHVek";
+
+WiFiClientSecure secured_client;
+UniversalTelegramBot bot(BOT_TOKEN, secured_client);
+
+unsigned long bot_lasttime;
+const unsigned long BOT_MTBS = 1000;
+char cmd_telegram = CMD_NOOP;
+String GOOGLE_SCRIPT_ID = "AKfycbwJAEoSi6vcABko5iTD-Q3XUKeD-CPud2Lvb98-xz9LzPhTtnFN_52YxKD8uzWeE-o-";
+String urlFinal;
 int buttonCounter = 0;
+String nullstring = "";
 String logTrigger = "";
 String output4State = "off";
-int rfidLastUpdate = 0;
+int rfidLastUpdate = RFIDUPDATETIME;
 bool rfidinit = false;
+TaskHandle_t taskhandle_1;
 WiFiServer server(80);
 String header;  //holds HTTP request
 class Terminal {
@@ -54,12 +66,10 @@ Terminal *terminal;
 
 void setup() {
   for (int i = 0; i < MEMBERS; i++) {
-    MasterTag[i] = 0;
+    MasterTag[i] = &nullstring;
   }
   MasterTag[0] = new String("C1834E24");
- 
 
-  
   terminal = new Terminal();
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   pinMode(PIN_RELAY, OUTPUT);
@@ -67,8 +77,7 @@ void setup() {
 
   pinMode(DOOR_C, OUTPUT);
   //PinMode(DOOR_NO, INPUT);
-  pinMode(DOOR_NC, INPUT);
-
+  pinMode(DOOR_NC, INPUT_PULLUP);
   Serial.begin(115200);
 
   Serial.println("The device started, now you can pair it with bluetooth!");
@@ -90,11 +99,13 @@ void setup() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
   server.begin();
+  secured_client.setCACert(TELEGRAM_CERTIFICATE_ROOT);
 }
 
 void loop() {
   static char cmd = CMD_NOOP;
   uint8_t source = CMD_SOURCE_SERIAL;
+
   if (Serial.available()) {
     cmd = Serial.read();
     source = CMD_SOURCE_SERIAL;
@@ -108,13 +119,15 @@ void loop() {
 
   digitalWrite(DOOR_C, HIGH);
   delay(5);
-  if ((door_locked == true) && (digitalRead(DOOR_NC) == LOW)) {
+  if (door_locked == true) {
+    if (digitalRead(DOOR_NC) == LOW) {
     door_closed = true;
   } else  //if (digitalRead(DOOR_NO) == LOW)
   {
     door_closed = false;
-  }
+  }}
   digitalWrite(DOOR_C, LOW);
+
 
   if ((cmd == '\r') || (cmd == '\n')) {
     cmd = CMD_NOOP;
@@ -127,13 +140,28 @@ void loop() {
         terminal->println(" Access Granted!  ");
         logTrigger = "rfid";
         // You can write any code here like opening doors, switching on a relay, lighting up an LED, or anything else you can think of.
-      } else {
+      }} else {
         terminal->println(" Access Denied!  ");
-      }
+        bot.sendMessage(CHAT_ID_1, "Unauthorized RFID: " + tagID , "");
+      
     }
   }
   //Serial.print(tagID);
-  
+
+
+
+  //    ----READ 
+  if (millis() - bot_lasttime > BOT_MTBS) {
+    int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+    while (numNewMessages) {
+      Serial.println("got response");
+      handleNewMessages(numNewMessages);
+      numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+      cmd = cmd_telegram;
+    }
+    bot_lasttime = millis();
+  }
+
 
   WiFiClient client = server.available();  // Listen for incoming clients
   if (client) {                            // If a new client connects,
@@ -217,6 +245,7 @@ void loop() {
     Serial.println("");
   }
 
+  //---COMMANDS--------
   if (cmd != CMD_NOOP) {
     terminal->println(&cmd);
     switch (tolower(cmd)) {
@@ -257,31 +286,18 @@ void loop() {
     }
   }
 
-  delay(20);
-
-  for (int i = 1; i < MEMEBERS ; i++) {
-    if ()
-  HTTPClient http;
-  int j = i+1;
-  String urlRead =  "https://script.google.com/macros/s/" + GOOGLE_SCRIPT_ID + "/exec?sheet=rfidlist&read=a" + j;
-  http.begin(urlRead.c_str());
-  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-  int httpCode = http.GET();
-  Serial.print("HTTP Status Code: ");
-  Serial.println(httpCode);
-  String payload1 = String(http.getString());
-  Serial.print("banana ");
-  Serial.println(payload1);
-  http.end();
-  MasterTag[i] = payload1;
+  if ((millis() - rfidLastUpdate > RFIDUPDATETIME) && rfidinit == false) {
+    xTaskCreatePinnedToCore(rfidUpdate, "Task1", 20000, NULL, 1, &taskhandle_1, 0);
+    rfidLastUpdate = millis();
+    Serial.println("rfidinit true");
   }
 
-
-
-String urlFinal;
-  if (!(logTrigger == "")){
-    if (logTrigger == "button")  urlFinal = "https://script.google.com/macros/s/" + GOOGLE_SCRIPT_ID + "/exec?sheet=rfidlog" + "&count=" + String(buttonCounter) + "&date=button-pressed";
-    else if (logTrigger == "rfid")  urlFinal = "https://script.google.com/macros/s/" + GOOGLE_SCRIPT_ID + "/exec?sheet=rfidlog" + "&count=" + String(buttonCounter) + "&date=" + tagID;
+  if (!(logTrigger == "")) {
+    if (logTrigger == "button") urlFinal = "https://script.google.com/macros/s/" + GOOGLE_SCRIPT_ID + "/exec?sheet=rfidlog" + "&count=" + String(buttonCounter) + "&tagid=button%20pressed";
+    else if (logTrigger == "rfid") {
+      urlFinal = "https://script.google.com/macros/s/" + GOOGLE_SCRIPT_ID + "/exec?sheet=rfidlog" + "&count=" + String(buttonCounter) + "&tagid=" + tagID;
+      bot.sendMessage(CHAT_ID_1, "The door was opened with RFID tag: " + tagID, "");
+    }
     Serial.print("POST data to spreadsheet:");
     Serial.println(urlFinal);
     HTTPClient http;
@@ -298,8 +314,10 @@ String urlFinal;
     http.end();
     buttonCounter++;
     logTrigger = "";
+    urlFinal = "";
   }
-  tagID = "";   
+  tagID = "";
+  delay(20);
 }
 
 
@@ -308,7 +326,6 @@ boolean query_access(String tagID) {
     if (MasterTag[i] == 0) return false;
     Serial.println(String("'") + tagID + "' <=> '" + *MasterTag[i] + "'");
     if (tagID.equals(*MasterTag[i])) {
-      Serial.println("Gotta");
       return true;
     }
   }
@@ -334,4 +351,71 @@ boolean getID() {
   Serial.println(tagID);
   mfrc522.PICC_HaltA();  // Stop reading
   return true;
+}
+
+void rfidUpdate(void *para) {
+  rfidinit = true;
+  Serial.print("Task1 running on core ");
+  Serial.println(xPortGetCoreID());
+  for (int i = 1; i < MEMBERS; i++) {
+    HTTPClient http;
+    int j = i + 1;
+    urlFinal = "https://script.google.com/macros/s/" + GOOGLE_SCRIPT_ID + "/exec?sheet=rfidlist&read=a" + j;
+    http.begin(urlFinal.c_str());
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    int httpCode = http.GET();
+    //Serial.print("HTTP Status Code: ");
+    //Serial.println(httpCode);
+    String payload1 = String(http.getString());
+    urlFinal = "";
+    //if (payload1 == "") break;
+    MasterTag[i] =  new String(payload1);
+    Serial.print("init rfid ");
+    Serial.print(i);
+    Serial.print(": ");
+    Serial.println(*MasterTag[i]);
+    http.end();
+  }
+  rfidinit = false;
+  vTaskDelete(taskhandle_1);
+}
+
+void handleNewMessages(int numNewMessages) {
+  for (int i = 0; i < numNewMessages; i++) {
+    bot.sendMessage(bot.messages[i].chat_id, bot.messages[i].text, "");
+    String text = bot.messages[i].text;
+    Serial.println(text);
+    String from_name = bot.messages[i].from_name;
+    String chat_id = bot.messages[i].chat_id;
+     if ((chat_id != CHAT_ID_1) || (chat_id != CHAT_ID_2)) {
+      bot.sendMessage(chat_id, "Unauthorized user", "");
+      continue;
+    }
+    if ((text == "/start") || (text == "/help")) {
+      String welcome = "Welcome, " + from_name + ".\n";
+      welcome += "Use the following commands to control your outputs.\n\n";
+      welcome += "/open \n";
+      welcome += "/close \n";
+      welcome += "/state \n";
+      bot.sendMessage(chat_id, welcome, "");
+    }
+    if (text == "/open") {
+      bot.sendMessage(chat_id, "DOOR OPEN", "");
+      //ledState = HIGH;
+      digitalWrite(PIN_RELAY, HIGH);
+      cmd_telegram = CMD_OPEN;  
+    }
+    if (text == "/close") {
+      bot.sendMessage(chat_id, "DOOR CLOSE", "");
+      //ledState = LOW;
+      digitalWrite(PIN_RELAY, LOW);
+      door_locked = false;
+    }
+    if (text == "/state") {
+      if (door_locked == true) {
+        if (door_closed == true) bot.sendMessage(chat_id, "The door is locked and closed.", "");
+        else bot.sendMessage(chat_id, "The door is not closed", "");
+      } else bot.sendMessage(chat_id, "The door is unlocked", "");
+    }
+  }
 }
